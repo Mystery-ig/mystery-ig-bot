@@ -1,0 +1,63 @@
+
+name: Test Instagram Connection
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-instagram:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Instagram API
+        env:
+          IG_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          import urllib.parse
+          import urllib.error
+
+          token = os.environ.get("IG_TOKEN", "")
+          if not token:
+              raise SystemExit(
+                  "ERROR: Instagram token is missing."
+              )
+
+          params = urllib.parse.urlencode({
+              "fields": "id,username"
+          })
+
+          url = (
+              "https://graph.instagram.com/"
+              "v25.0/me?" + params
+          )
+
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "Authorization": "Bearer " + token
+              }
+          )
+
+          try:
+              with urllib.request.urlopen(
+                  request, timeout=30
+              ) as response:
+                  data = json.load(response)
+
+              print("SUCCESS: Instagram API connected!")
+              print("Username:", data.get("username"))
+              print("Account ID:", data.get("id"))
+
+          except urllib.error.HTTPError as error:
+              print("Instagram API request failed.")
+              print("HTTP status:", error.code)
+              print("Check token and API permissions.")
+              raise SystemExit(1)
+          PY
