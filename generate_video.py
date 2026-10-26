@@ -1,4 +1,4 @@
-"""Offline narrated mystery prototype. Uses Pillow, FFmpeg, and eSpeak NG."""
+"""Offline mystery reel with Piper neural narration, Pillow, and FFmpeg."""
 import math
 import os
 import subprocess
@@ -102,11 +102,23 @@ def frame(t):
 def run(cmd):
     subprocess.run(cmd,check=True)
 
-# TTS clips generated automatically using a free voice engine, timed to the animation.
+# Generate a separate Piper neural narration clip for each scene.
+# The voice model is downloaded by the GitHub workflow.
+import wave
+from piper import PiperVoice
+
+voice = PiperVoice.load('en_US-lessac-medium.onnx')
 clips=[]
 for i, (start,end,dialogue,_) in enumerate(SCENES):
     clip=str(OUT.parent / f'voice_{i}.wav')
-    run(['espeak-ng','-v','en-us','-s','145','-p','38','-a','170','-w',clip,dialogue])
+    with wave.open(clip, 'wb') as audio:
+        voice.synthesize_wav(dialogue, audio)
+    with wave.open(clip, 'rb') as audio:
+        clip_duration = audio.getnframes() / audio.getframerate()
+    scene_duration = end-start
+    if clip_duration > scene_duration - 0.3:
+        print(f'WARNING: Scene {i+1}: speech duration {clip_duration:.1f}s '
+              f'exceeds available {scene_duration:.1f}s; adjust story timing later.', flush=True)
     clips.append((start,clip))
 
 print('Rendering animated frames...',flush=True)
@@ -122,17 +134,16 @@ with subprocess.Popen(raw_cmd,stdin=subprocess.PIPE) as proc:
     proc.stdin.close()
     if proc.wait()!=0: raise RuntimeError('FFmpeg video rendering failed')
 
-print('Mixing narration and atmospheric sound...',flush=True)
+print('Mixing Piper narration and atmospheric sound...',flush=True)
 cmd=['ffmpeg','-hide_banner','-loglevel','error','-y','-i',str(OUT.parent/'silent.mp4')]
 for _,clip in clips: cmd.extend(['-i',clip])
 # Low atmospheric tone, with narration delayed to its matching scene.
 filters=['sine=frequency=67:sample_rate=22050:duration=39,volume=0.035[amb]']
 for idx,(start,_) in enumerate(clips, start=1):
-    filters.append(f'[{idx}:a]aformat=sample_rates=22050:channel_layouts=mono,adelay={start*1000}:all=1,volume=1.6[v{idx}]')
+    filters.append(f'[{idx}:a]aformat=sample_rates=22050:channel_layouts=mono,adelay={start*1000}:all=1,volume=1.15[v{idx}]')
 filters.append('[amb]'+''.join(f'[v{i}]' for i in range(1,len(clips)+1))+
                f'amix=inputs={len(clips)+1}:duration=longest:normalize=0,atrim=0:39[aout]')
 cmd.extend(['-filter_complex',';'.join(filters),'-map','0:v:0','-map','[aout]',
             '-c:v','copy','-c:a','aac','-b:a','128k','-shortest','-movflags','+faststart',str(OUT)])
 run(cmd)
 print('Created:',OUT,flush=True)
-
