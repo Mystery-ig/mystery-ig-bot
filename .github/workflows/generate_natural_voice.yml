@@ -1,0 +1,42 @@
+name: Generate Mystery with Natural Voice
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements-voice.txt
+
+      - name: Install video and Python dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core
+          python -m pip install -r requirements-voice.txt
+
+      - name: Download Piper voice
+        run: python -m piper.download_voices en_US-lessac-medium
+
+      - name: Render mystery with natural narration
+        run: python generate_video.py
+
+      - name: Save video for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: mystery-natural-voice
+          path: output/mystery_episode_02.mp4
+          retention-days: 7
+          if-no-files-found: error
