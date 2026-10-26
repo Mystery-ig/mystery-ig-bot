@@ -1,0 +1,57 @@
+name: Render Story-Driven Episode
+
+on:
+  workflow_dispatch:
+    inputs:
+      story_seed:
+        description: 'Test story seed (any integer)'
+        required: true
+        default: '4'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements-voice.txt
+
+      - name: Install FFmpeg and Python dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core
+          python -m pip install -r requirements-voice.txt
+
+      - name: Create one story episode
+        env:
+          STORY_SEED: ${{ inputs.story_seed }}
+        run: |
+          python story_engine.py init --seed "$STORY_SEED"
+          python -m json.tool story/current_episode.json > /dev/null
+
+      - name: Download offline narrator
+        run: python -m piper.download_voices en_US-lessac-medium
+
+      - name: Render narration and animated scenes
+        run: python render_story_episode.py --episode story/current_episode.json
+
+      - name: Upload video and episode JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: story-driven-episode
+          path: |
+            output/mystery_episode_*.mp4
+            story/current_episode.json
+          if-no-files-found: error
+          retention-days: 7
