@@ -1,0 +1,65 @@
+
+name: Test Natural AI Voice
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-voice:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Piper TTS
+        run: |
+          python -m pip install --upgrade pip
+          pip install piper-tts
+
+      - name: Download English voice
+        run: |
+          python -m piper.download_voices en_US-lessac-medium
+
+      - name: Generate mystery narration
+        run: |
+          python - <<'PY'
+          import wave
+          from pathlib import Path
+          from piper import PiperVoice
+
+          voice = PiperVoice.load(
+              "en_US-lessac-medium.onnx"
+          )
+
+          text = (
+              "At exactly three seventeen in the morning, "
+              "Emma received a voicemail from herself. "
+              "The message contained only six words. "
+              "Do not open apartment four oh four. "
+              "But something was wrong. "
+              "Her building didn't have a fourth floor. "
+              "Then, the elevator doors opened."
+          )
+
+          Path("output").mkdir(exist_ok=True)
+
+          with wave.open(
+              "output/mystery_voice_test.wav", "wb"
+          ) as audio:
+              voice.synthesize_wav(text, audio)
+
+          print("Narration generated successfully.")
+          PY
+
+      - name: Upload voice recording
+        uses: actions/upload-artifact@v4
+        with:
+          name: natural-mystery-voice
+          path: output/mystery_voice_test.wav
+          retention-days: 7
