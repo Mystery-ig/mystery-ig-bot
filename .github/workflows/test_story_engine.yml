@@ -1,0 +1,24 @@
+name: Test Branching Mystery Engine
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-story:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simulate mystery arcs with different lengths
+        run: |
+          python3 story_engine.py demo --seed 2
+          python3 story_engine.py demo --seed 3
+          python3 story_engine.py demo --seed 4
+      - name: Download latest sample episode JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: mystery-story-engine-test
+          path: story/current_episode.json
+          retention-days: 7
