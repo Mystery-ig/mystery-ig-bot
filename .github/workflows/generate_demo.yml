@@ -1,0 +1,29 @@
+
+name: Generate Mystery Demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install image library
+        run: python3 -m pip install --break-system-packages Pillow
+
+      - name: Render mystery video
+        run: python3 generate_video.py
+
+      - name: Save video for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: mystery-episode-demo
+          path: output/mystery_episode_01.mp4
+          retention-days: 7
